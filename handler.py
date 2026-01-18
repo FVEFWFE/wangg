@@ -15,6 +15,10 @@ import base64
 from io import BytesIO
 from PIL import Image
 
+# Force CUDA device
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+torch.set_default_device("cuda")
+
 # Global model - loaded once at cold start
 pipe = None
 
@@ -74,26 +78,30 @@ def load_model():
     try:
         from diffusers import DiffusionPipeline
 
+        # Explicitly set device to avoid XPU detection issues
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"[Handler] Using device: {device}")
+
         model_id = os.environ.get("MODEL_ID", "Wan-AI/Wan2.2-Animate-14B-Diffusers")
 
         pipe = DiffusionPipeline.from_pretrained(
             model_id,
             torch_dtype=torch.float16,
+            device_map="cuda",
         )
 
-        # Move to GPU
-        pipe = pipe.to("cuda")
-
         # Enable memory optimizations
-        if hasattr(pipe, 'enable_model_cpu_offload'):
-            pipe.enable_model_cpu_offload()
         if hasattr(pipe, 'enable_vae_slicing'):
             pipe.enable_vae_slicing()
+        if hasattr(pipe, 'enable_vae_tiling'):
+            pipe.enable_vae_tiling()
 
         print("[Handler] Model loaded successfully")
 
     except Exception as e:
         print(f"[Handler] Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
     return pipe
@@ -194,8 +202,8 @@ def handler(job):
         # Load model
         pipe = load_model()
 
-        # Set random seed
-        generator = torch.Generator(device="cuda").manual_seed(seed)
+        # Set random seed - use CPU generator to avoid device issues
+        generator = torch.Generator().manual_seed(seed)
 
         # Extract reference frames from video
         reference_frames = extract_frames_from_video(video_path, max_frames=num_frames)
