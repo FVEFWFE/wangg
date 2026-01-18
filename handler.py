@@ -22,6 +22,14 @@ if not hasattr(torch, 'xpu'):
             return False
         def device_count(self):
             return 0
+        def empty_cache(self):
+            pass
+        def synchronize(self):
+            pass
+        def current_device(self):
+            return 0
+        def set_device(self, device):
+            pass
     torch.xpu = FakeXPU()
 
 import runpod
