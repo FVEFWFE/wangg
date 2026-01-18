@@ -6,18 +6,30 @@ Takes a character face image + performer video, outputs character
 doing the performer's movements/expressions.
 """
 
-import runpod
-import torch
 import os
+import sys
+
+# Force CUDA and disable XPU before any torch imports
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["PYTORCH_ENABLE_XPU"] = "0"
+
+import torch
+
+# Monkey-patch torch.xpu if it doesn't exist (for older PyTorch versions)
+if not hasattr(torch, 'xpu'):
+    class FakeXPU:
+        def is_available(self):
+            return False
+        def device_count(self):
+            return 0
+    torch.xpu = FakeXPU()
+
+import runpod
 import tempfile
 import requests
 import base64
 from io import BytesIO
 from PIL import Image
-
-# Force CUDA device
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-torch.set_default_device("cuda")
 
 # Global model - loaded once at cold start
 pipe = None
