@@ -72,54 +72,16 @@ if not hasattr(torch.distributed, 'device_mesh'):
     print("[Handler] Applied device_mesh compatibility patch")
 
 # ALWAYS replace torch.xpu - RunPod base image has broken/incomplete FakeXPU
-# that causes AttributeError: 'FakeXPU' object has no attribute 'empty_cache'
+# For PyTorch 2.4+, we use torch.cuda.Event as the base for FakeXPU Event
+# This properly inherits from _EventBase as required by DeviceInterface
 
-# Create FakeEvent class that inherits from appropriate base for PyTorch 2.4+
-# This fixes: "DeviceInterface member Event should be inherit from _EventBase"
-try:
-    # PyTorch 2.4+ has torch.Event as the base class
-    if hasattr(torch, 'Event'):
-        class FakeXPUEvent(torch.Event):
-            def __init__(self, enable_timing=False, blocking=False, interprocess=False):
-                pass
-            def record(self, stream=None): pass
-            def wait(self, stream=None): pass
-            def query(self): return True
-            def elapsed_time(self, end_event): return 0.0
-            def synchronize(self): pass
-    elif hasattr(torch, '_EventBase'):
-        class FakeXPUEvent(torch._EventBase):
-            def __init__(self, enable_timing=False, blocking=False, interprocess=False):
-                pass
-            def record(self, stream=None): pass
-            def wait(self, stream=None): pass
-            def query(self): return True
-            def elapsed_time(self, end_event): return 0.0
-            def synchronize(self): pass
-    else:
-        # Fallback for older PyTorch
-        class FakeXPUEvent:
-            def __init__(self, enable_timing=False, blocking=False, interprocess=False):
-                pass
-            def record(self, stream=None): pass
-            def wait(self, stream=None): pass
-            def query(self): return True
-            def elapsed_time(self, end_event): return 0.0
-            def synchronize(self): pass
-except Exception as e:
-    print(f"[Handler] FakeXPUEvent fallback: {e}")
-    class FakeXPUEvent:
-        def __init__(self, enable_timing=False, blocking=False, interprocess=False):
-            pass
-        def record(self, stream=None): pass
-        def wait(self, stream=None): pass
-        def query(self): return True
-        def elapsed_time(self, end_event): return 0.0
-        def synchronize(self): pass
+# Use CUDA Event as the Event class for fake XPU (since we're on CUDA anyway)
+FakeXPUEvent = torch.cuda.Event
 
 class CompleteFakeXPU:
     """Complete mock of torch.xpu for CUDA-only environments."""
-    Event = FakeXPUEvent  # Required by PyTorch 2.4+ DeviceInterface
+    # Use CUDA Event class - it properly inherits from _EventBase
+    Event = FakeXPUEvent
 
     def is_available(self): return False
     def device_count(self): return 0
@@ -144,8 +106,8 @@ class CompleteFakeXPU:
         def fake_method(*args, **kwargs): return None
         return fake_method
 
-torch.xpu = CompleteFakeXPU()  # Unconditional replacement
-print("[Handler] Applied FakeXPU with Event class")
+torch.xpu = CompleteFakeXPU()
+print("[Handler] Applied FakeXPU with CUDA Event class")
 
 # Fix PyTorch 2.3+ pytree compatibility - register_pytree_node was moved/removed
 # Some older diffusers/transformers code still tries to access it
