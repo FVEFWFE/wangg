@@ -15,22 +15,34 @@ os.environ["PYTORCH_ENABLE_XPU"] = "0"
 
 import torch
 
-# Monkey-patch torch.xpu if it doesn't exist (for older PyTorch versions)
-if not hasattr(torch, 'xpu'):
-    class FakeXPU:
-        def is_available(self):
-            return False
-        def device_count(self):
-            return 0
-        def empty_cache(self):
-            pass
-        def synchronize(self):
-            pass
-        def current_device(self):
-            return 0
-        def set_device(self, device):
-            pass
-    torch.xpu = FakeXPU()
+# ALWAYS replace torch.xpu - RunPod base image has broken/incomplete FakeXPU
+# that causes AttributeError: 'FakeXPU' object has no attribute 'empty_cache'
+class CompleteFakeXPU:
+    """Complete mock of torch.xpu for CUDA-only environments."""
+    def is_available(self): return False
+    def device_count(self): return 0
+    def empty_cache(self): pass
+    def synchronize(self, device=None): pass
+    def current_device(self): return 0
+    def set_device(self, device): pass
+    def manual_seed(self, seed): pass
+    def manual_seed_all(self, seed): pass
+    def get_rng_state(self, device=None): return torch.ByteTensor()
+    def set_rng_state(self, new_state, device=None): pass
+    def max_memory_allocated(self, device=None): return 0
+    def memory_allocated(self, device=None): return 0
+    def memory_reserved(self, device=None): return 0
+    def reset_peak_memory_stats(self, device=None): pass
+    def mem_get_info(self, device=None): return (0, 0)
+    def memory_stats(self, device=None): return {}
+    def memory_summary(self, device=None, abbreviated=False): return ""
+    def get_device_name(self, device=None): return "FakeXPU"
+    def __getattr__(self, name):
+        """Catch-all for any other xpu methods diffusers might call."""
+        def fake_method(*args, **kwargs): return None
+        return fake_method
+
+torch.xpu = CompleteFakeXPU()  # Unconditional replacement
 
 import runpod
 import tempfile
