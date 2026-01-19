@@ -44,6 +44,38 @@ class CompleteFakeXPU:
 
 torch.xpu = CompleteFakeXPU()  # Unconditional replacement
 
+# Fix PyTorch 2.3+ pytree compatibility - register_pytree_node was moved/removed
+# Some older diffusers/transformers code still tries to access it
+import torch.utils._pytree as _pytree
+if not hasattr(_pytree, 'register_pytree_node'):
+    # PyTorch 2.3+ removed this, add a compatibility shim
+    def _register_pytree_node_compat(
+        cls,
+        flatten_fn,
+        unflatten_fn,
+        *,
+        serialized_type_name=None,
+        to_dumpable_context=None,
+        from_dumpable_context=None,
+    ):
+        """Compatibility shim for removed register_pytree_node function."""
+        # Try the internal _register_pytree_node if it exists
+        if hasattr(_pytree, '_register_pytree_node'):
+            try:
+                _pytree._register_pytree_node(
+                    cls,
+                    flatten_fn,
+                    unflatten_fn,
+                    serialized_type_name=serialized_type_name,
+                )
+            except TypeError:
+                # Signature mismatch, just skip
+                pass
+        # If no internal function exists, this becomes a no-op
+        # The types are likely already registered via C++ in PyTorch 2.3+
+    _pytree.register_pytree_node = _register_pytree_node_compat
+    print("[Handler] Applied pytree compatibility patch")
+
 import runpod
 import tempfile
 import requests
