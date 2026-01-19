@@ -1,6 +1,6 @@
 # RunPod Serverless Worker for Wan 2.2 Animate
-# Using RunPod PyTorch 2.2.0 base - XPU error was false alarm, it was disk space
-FROM runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04
+# Using RunPod PyTorch 2.4.0 base - required for torch.nn.RMSNorm (diffusers 0.36+)
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 WORKDIR /app
 
