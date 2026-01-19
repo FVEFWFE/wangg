@@ -243,25 +243,42 @@ def load_model():
     print("[Handler] Loading Wan 2.2 Animate model...")
 
     try:
-        from diffusers import DiffusionPipeline
+        # Try to import WanAnimatePipeline directly first
+        try:
+            from diffusers import WanAnimatePipeline
+            print("[Handler] Using WanAnimatePipeline")
+        except ImportError:
+            # Fallback to auto-detection
+            from diffusers import DiffusionPipeline as WanAnimatePipeline
+            print("[Handler] Using DiffusionPipeline (auto-detect)")
 
         # Explicitly set device to avoid XPU detection issues
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"[Handler] Using device: {device}")
+        print(f"[Handler] CUDA available: {torch.cuda.is_available()}")
+        if torch.cuda.is_available():
+            print(f"[Handler] GPU: {torch.cuda.get_device_name(0)}")
+            print(f"[Handler] VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
 
         model_id = os.environ.get("MODEL_ID", "Wan-AI/Wan2.2-Animate-14B-Diffusers")
+        print(f"[Handler] Loading model: {model_id}")
 
-        pipe = DiffusionPipeline.from_pretrained(
+        pipe = WanAnimatePipeline.from_pretrained(
             model_id,
             torch_dtype=torch.float16,
-            device_map="cuda",
         )
+
+        # Enable CPU offload for memory efficiency on A100 80GB
+        pipe.enable_model_cpu_offload()
+        print("[Handler] Enabled model CPU offload")
 
         # Enable memory optimizations
         if hasattr(pipe, 'enable_vae_slicing'):
             pipe.enable_vae_slicing()
+            print("[Handler] Enabled VAE slicing")
         if hasattr(pipe, 'enable_vae_tiling'):
             pipe.enable_vae_tiling()
+            print("[Handler] Enabled VAE tiling")
 
         print("[Handler] Model loaded successfully")
 
@@ -380,19 +397,40 @@ def handler(job):
 
         # Run the pipeline
         print("[Handler] Running inference...")
+        print(f"[Handler] Image size: {image.size}, Reference frames: {len(reference_frames)}")
 
-        output = pipe(
-            image=image,
-            video=reference_frames,
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            height=height,
-            width=width,
-            num_frames=min(num_frames, len(reference_frames)),
-            guidance_scale=guidance_scale,
-            num_inference_steps=num_inference_steps,
-            generator=generator,
-        )
+        # WanAnimatePipeline uses pose_video and face_video parameters
+        # The pose_video provides motion, face_video provides facial expressions
+        # For character animation, both typically come from the same reference video
+        try:
+            output = pipe(
+                image=image,
+                pose_video=reference_frames,
+                face_video=reference_frames,
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                height=height,
+                width=width,
+                num_frames=min(num_frames, len(reference_frames)),
+                guidance_scale=guidance_scale,
+                num_inference_steps=num_inference_steps,
+                generator=generator,
+            )
+        except TypeError as e:
+            # Fallback: try with 'video' parameter (older diffusers versions)
+            print(f"[Handler] Trying fallback params due to: {e}")
+            output = pipe(
+                image=image,
+                video=reference_frames,
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                height=height,
+                width=width,
+                num_frames=min(num_frames, len(reference_frames)),
+                guidance_scale=guidance_scale,
+                num_inference_steps=num_inference_steps,
+                generator=generator,
+            )
 
         # Get output frames
         frames = output.frames[0] if hasattr(output, 'frames') else output.images
