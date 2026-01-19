@@ -72,16 +72,18 @@ if not hasattr(torch.distributed, 'device_mesh'):
     print("[Handler] Applied device_mesh compatibility patch")
 
 # ALWAYS replace torch.xpu - RunPod base image has broken/incomplete FakeXPU
-# For PyTorch 2.4+, we use torch.cuda.Event as the base for FakeXPU Event
-# This properly inherits from _EventBase as required by DeviceInterface
+# For PyTorch 2.4+, we use torch.cuda classes for Event and Stream
+# These properly inherit from _EventBase/_StreamBase as required by DeviceInterface
 
-# Use CUDA Event as the Event class for fake XPU (since we're on CUDA anyway)
+# Use CUDA Event and Stream classes for fake XPU (since we're on CUDA anyway)
 FakeXPUEvent = torch.cuda.Event
+FakeXPUStream = torch.cuda.Stream
 
 class CompleteFakeXPU:
     """Complete mock of torch.xpu for CUDA-only environments."""
-    # Use CUDA Event class - it properly inherits from _EventBase
+    # Use CUDA Event and Stream classes - they properly inherit from required bases
     Event = FakeXPUEvent
+    Stream = FakeXPUStream
 
     def is_available(self): return False
     def device_count(self): return 0
@@ -107,7 +109,7 @@ class CompleteFakeXPU:
         return fake_method
 
 torch.xpu = CompleteFakeXPU()
-print("[Handler] Applied FakeXPU with CUDA Event class")
+print("[Handler] Applied FakeXPU with CUDA Event/Stream classes")
 
 # Fix PyTorch 2.3+ pytree compatibility - register_pytree_node was moved/removed
 # Some older diffusers/transformers code still tries to access it
