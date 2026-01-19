@@ -6,8 +6,9 @@ diffusers>=0.30.0
 transformers>=4.40.0
 accelerate>=0.30.0
 
-# PyTorch installed separately in Dockerfile from CUDA-only wheel
-# to avoid XPU issues in pre-built images
+# PyTorch (in base image - 2.2.0)
+torch>=2.2.0,<2.4.0
+torchvision>=0.17.0,<0.19.0
 
 # Image/video processing
 Pillow>=10.0.0
