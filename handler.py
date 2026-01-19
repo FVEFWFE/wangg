@@ -9,11 +9,27 @@ doing the performer's movements/expressions.
 import os
 import sys
 
-# Force CUDA and disable XPU before any torch imports
+# Force CUDA and completely disable XPU before any torch imports
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["PYTORCH_ENABLE_XPU"] = "0"
+os.environ["USE_XPU"] = "0"
+os.environ["INTEL_XPU_BACKEND"] = "0"
+os.environ["SYCL_DEVICE_FILTER"] = ""
+os.environ["ZE_AFFINITY_MASK"] = ""
+# Disable Intel oneAPI
+os.environ["ONEAPI_DEVICE_SELECTOR"] = "cuda:*"
+
+# Block XPU module loading by pre-registering empty module
+import types
+fake_xpu_module = types.ModuleType('torch.xpu')
+fake_xpu_module.is_available = lambda: False
+fake_xpu_module.device_count = lambda: 0
+sys.modules['torch.xpu'] = fake_xpu_module
 
 import torch
+
+# Ensure torch.xpu points to our fake module
+torch.xpu = fake_xpu_module
 
 # Fix torch.distributed.device_mesh for PyTorch < 2.3
 # Diffusers expects this module which was added in PyTorch 2.3
