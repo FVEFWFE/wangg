@@ -1,24 +1,27 @@
 # RunPod SDK
 runpod>=1.6.0
 
-# Diffusers and transformers for Wan 2.2
-diffusers>=0.30.0
-transformers>=4.40.0
+# Diffusers and transformers for Wan 2.2 Animate
+# Need diffusers>=0.36.0 for WanAnimatePipeline
+diffusers>=0.36.0
+transformers>=4.40.0,<=4.51.3
 accelerate>=0.30.0
+ftfy
 
 # PyTorch (in base image - 2.2.0)
-torch>=2.2.0,<2.4.0
-torchvision>=0.17.0,<0.19.0
+# Don't upgrade torch in container, use base image version
+# torch>=2.2.0,<2.4.0
+# torchvision>=0.17.0,<0.19.0
 
 # Image/video processing
 Pillow>=10.0.0
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
 imageio>=2.34.0
 imageio-ffmpeg>=0.4.9
 
 # Utilities
 requests>=2.31.0
-numpy>=1.24.0
+numpy>=1.24.0,<2
 safetensors>=0.4.0
 
 # HuggingFace Hub for model downloads
