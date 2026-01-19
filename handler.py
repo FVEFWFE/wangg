@@ -15,6 +15,32 @@ os.environ["PYTORCH_ENABLE_XPU"] = "0"
 
 import torch
 
+# Fix torch.distributed.device_mesh for PyTorch < 2.3
+# Diffusers expects this module which was added in PyTorch 2.3
+if not hasattr(torch.distributed, 'device_mesh'):
+    # Create a mock device_mesh module
+    import types
+    device_mesh_module = types.ModuleType('torch.distributed.device_mesh')
+
+    class DeviceMesh:
+        """Mock DeviceMesh for compatibility."""
+        def __init__(self, device_type="cuda", mesh=None):
+            self.device_type = device_type
+            self.mesh = mesh or [[0]]
+        def get_rank(self): return 0
+        def get_local_rank(self): return 0
+        def size(self, dim=0): return 1
+        def get_group(self, mesh_dim=None): return None
+
+    device_mesh_module.DeviceMesh = DeviceMesh
+    device_mesh_module.init_device_mesh = lambda *args, **kwargs: DeviceMesh()
+
+    # Register the mock module
+    import sys
+    sys.modules['torch.distributed.device_mesh'] = device_mesh_module
+    torch.distributed.device_mesh = device_mesh_module
+    print("[Handler] Applied device_mesh compatibility patch")
+
 # ALWAYS replace torch.xpu - RunPod base image has broken/incomplete FakeXPU
 # that causes AttributeError: 'FakeXPU' object has no attribute 'empty_cache'
 class CompleteFakeXPU:
