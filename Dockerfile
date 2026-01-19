@@ -1,5 +1,6 @@
 # RunPod Serverless Worker for Wan 2.2 Animate
-FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
+# Using PyTorch 2.4+ for diffusers compatibility (device_mesh, pytree)
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 WORKDIR /app
 
