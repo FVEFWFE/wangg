@@ -9,6 +9,20 @@ doing the performer's movements/expressions.
 import os
 import sys
 
+# Force ALL caching to network volume to avoid disk space issues
+# Must be set BEFORE any HuggingFace imports
+os.environ["HF_HOME"] = "/runpod-volume/huggingface"
+os.environ["HF_HUB_CACHE"] = "/runpod-volume/huggingface/hub"
+os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume/huggingface"
+os.environ["TORCH_HOME"] = "/runpod-volume/torch"
+os.environ["TMPDIR"] = "/runpod-volume/tmp"
+os.environ["TEMP"] = "/runpod-volume/tmp"
+os.environ["TMP"] = "/runpod-volume/tmp"
+
+# Create temp dir if it doesn't exist
+os.makedirs("/runpod-volume/tmp", exist_ok=True)
+os.makedirs("/runpod-volume/huggingface/hub", exist_ok=True)
+
 # Force CUDA and completely disable XPU before any torch imports
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["PYTORCH_ENABLE_XPU"] = "0"
